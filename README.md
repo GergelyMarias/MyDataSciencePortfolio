@@ -10,7 +10,7 @@ Welcome to my Data Science Portfolio repository! This meticulously organized col
 2. **Insightful Reports:**
    Explore detailed reports that accompany the code. Unpack the story behind the algorithms, understand the nuances, and witness the magic unfold.
 
-## ML Algorithms Explored
+## Machine Learnings Algorithms that has been explored
 
 - **[Algorithm 1]:** Brief description and its significance.
 - **[Algorithm 2]:** Uncover the secrets and potential applications.
