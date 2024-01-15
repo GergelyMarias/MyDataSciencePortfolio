@@ -17,7 +17,7 @@ Welcome to my Data Science Portfolio repository! This meticulously organized col
 - **Penalizations:** Ridge(L2), LASSO(L1), Elastic Net; These penalization techniques are crucial for regularizing models and preventing overfitting, particularly when dealing with high-dimensional datasets or datasets with correlated features.
 - **Principal Component Analysis (PCA):**  Reduces dimensionality while preserving data variance. Useful for feature extraction and visualization, aiding in the compression of large datasets and noise reduction.
 - **Hierarchical Clustering:**  A clustering algorithm that organizes data points into a hierarchical tree-like structure, revealing relationships and similarities among data. Useful in exploratory data analysis and understanding hierarchical structures in datasets.
-- **K-Means Clustering:**  Groups data into k clusters based on similarity. Useful for partitioning data into distinct groups.
+- **[K-Means Clustering](https://github.com/GergelyMarias/MyDataSciencePortfolio/blob/main/KMeansClustering.pdf):**  Groups data into k clusters based on similarity. Useful for partitioning data into distinct groups.
 - **K-Nearest Neighbors (KNN):**  Classifies data points based on the majority class among their k-nearest neighbors. Valuable for pattern recognition.
 - **Naive Bayes:**  A probabilistic algorithm based on Bayes' theorem, often used for text classification. Efficient and useful in scenarios where independence assumptions are reasonable.
 - **Decision Trees:**  Tree-like models that make decisions based on input features. Useful for both classification and regression tasks, decision trees are interpretable and offer insights into feature importance.
