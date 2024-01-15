@@ -12,9 +12,9 @@ Welcome to my Data Science Portfolio repository! This meticulously organized col
 
 ## Machine Learnings Algorithms that has been explored
 
-- **[Algorithm 1]:** Brief description and its significance.
-- **[Algorithm 2]:** Uncover the secrets and potential applications.
-- **[Algorithm 3]:** A journey into the algorithmic wonders.
+- **Linear Regression:**  Predicts a continuous outcome based on one or more predictor variables. Useful when exploring the relationship between independent and dependent variables, allowing for predictions of quantitative values, such as sales forecasts or temperature predictions.
+- **Logistic Regression:**  Used for binary classification problems, predicting the probability of an event. Useful in scenarios where the outcome is categorical, such as spam detection or medical diagnosis, providing a probability score for each class.
+- **Decision Trees:**  Tree-like models that make decisions based on input features. Useful for both classification and regression tasks, decision trees are interpretable and offer insights into feature importance, making them valuable in scenarios like credit scoring or customer churn prediction.
 
 
 ## Connect with Me:
