@@ -29,6 +29,8 @@ Welcome to my Data Science Portfolio repository! This meticulously organized col
 - **Recurrent Neural Networks (RNN):**  Neural networks designed for sequence data, such as time series or text. Valuable in applications requiring memory of past events.
 - **Long Short-Term Memory (LSTM):**  A type of RNN designed to overcome the vanishing gradient problem. Essential for capturing long-term dependencies in sequential data.
 - **Convolutional Neural Networks (CNN):**  Deep learning models specifically designed for image recognition. Effective in capturing spatial hierarchies and patterns in images.
+  ##
+  **[Bayesian Optimalization](https://github.com/GergelyMarias/MyDataSciencePortfolio/blob/main/XGB_BayesianOptimalization.R)** Bayesian optimization is a technique used for fine-tuning the hyperparameters of machine learning models. It employs a probabilistic model to predict how different hyperparameter settings might impact the model's performance, helping to efficiently explore and discover optimal configurations in a systematic manner.
 
 ## Connect with Me:
 [LinkedIn](https://www.linkedin.com/in/mariasgergely/)
