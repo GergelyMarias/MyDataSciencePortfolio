@@ -12,10 +12,10 @@ Welcome to my Data Science Portfolio repository! This meticulously organized col
 
 ## Machine Learnings Algorithms that has been explored
 
-- **Linear Regression:**  Predicts a continuous outcome based on one or more predictor variables. Useful when exploring the relationship between independent and dependent variables, allowing for predictions of quantitative values.
+- **[Linear Regression](https://github.com/GergelyMarias/MyDataSciencePortfolio/blob/main/PCA%2BOLS(L1).pdf):**  Predicts a continuous outcome based on one or more predictor variables. Useful when exploring the relationship between independent and dependent variables, allowing for predictions of quantitative values.
 - **Logistic Regression:**  Used for binary classification problems, predicting the probability of an event. Useful in scenarios where the outcome is categorical.
-- **Penalizations:** Ridge(L2), LASSO(L1), Elastic Net; These penalization techniques are crucial for regularizing models and preventing overfitting, particularly when dealing with high-dimensional datasets or datasets with correlated features.
-- **Principal Component Analysis (PCA):**  Reduces dimensionality while preserving data variance. Useful for feature extraction and visualization, aiding in the compression of large datasets and noise reduction.
+- **Penalizations:** Ridge(L2), [LASSO(L1)](https://github.com/GergelyMarias/MyDataSciencePortfolio/blob/main/PCA%2BOLS(L1).pdf), Elastic Net; These penalization techniques are crucial for regularizing models and preventing overfitting, particularly when dealing with high-dimensional datasets or datasets with correlated features.
+- **[Principal Component Analysis (PCA)](https://github.com/GergelyMarias/MyDataSciencePortfolio/blob/main/PCA%2BOLS(L1).pdf):**  Reduces dimensionality while preserving data variance. Useful for feature extraction and visualization, aiding in the compression of large datasets and noise reduction.
 - **Hierarchical Clustering:**  A clustering algorithm that organizes data points into a hierarchical tree-like structure, revealing relationships and similarities among data. Useful in exploratory data analysis and understanding hierarchical structures in datasets.
 - **[K-Means Clustering](https://github.com/GergelyMarias/MyDataSciencePortfolio/blob/main/KMeansClustering.pdf):**  Groups data into k clusters based on similarity. Useful for partitioning data into distinct groups.
 - **K-Nearest Neighbors (KNN):**  Classifies data points based on the majority class among their k-nearest neighbors. Valuable for pattern recognition.
