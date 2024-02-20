@@ -1,0 +1,695 @@
+---
+title: "Predicting the happiness index using the gender statistics database"
+subtitle: "Introduction to Data Science - Assignment 3 - Gergely Máriás"
+output: 
+  pdf_document:
+    number_sections: true
+    highlight: tango
+    fig_caption: true
+    df_print: kable
+---
+
+# Introduction
+
+This research involves an analysis of the relationship between various variables from the Gender Statistics database and the World Happiness Index. The primary objective is to identify country characteristics that are associated with the happiness score and offer insights to address gender inequality and enhance overall well-being. The research question under consideration is: 
+
+**What are the key determinants of a country's happiness score, and how do they relate to gender equality metrics?**
+
+
+# Data Overview
+
+**Gender Statistics Database:** It was collected and maintained by the World Bank, which includes gender-related data on demographics, education, health, economic opportunities, public life, and decision-making across 115  countries. **World Happiness Report:** It collects survey data from over 134 countries to construct the World Happiness Index, representing how individuals rate their own lives based on a set of indicators. This dataset only contains the name of each country and its so-called "Happiness score".
+
+# Methodes
+
+**Principal Component Analysis** (PCA) simplifies complex data by creating new coordinate systems to capture important patterns and reduce dimensionality, with methods like Kaiser's rule, cumulative variance explained, and the Scree diagram assisting in the determination of the optimal number of components. Additionally, statistical techniques like **permutation tests** are employed to evaluate observed values, typically within a 95% confidence interval, while **bootstrapping** provides an approach for estimating statistical uncertainty, conducting hypothesis testing, and validating models, particularly in cases with non-standard assumptions or small sample sizes. Furthermore, **Principal Component Regression** (PCR) can be employed after PCA to build a predictive model by using the reduced-dimensional components to improve prediction accuracy and mitigate overfitting in complex datasets.
+
+**LASSO** (Least Absolute Shrinkage and Selection Operator) regression is a linear regression technique that incorporates a penalty term on the absolute values of the regression coefficients, encouraging a sparse model selection by forcing some coefficients to be exactly zero. This feature makes it effective for variable selection and preventing overfitting. **LOOCV** (Leave-One-Out Cross-Validation) is a validation method, particularly useful when the sample size is small, as it assesses model performance by iteratively training on all but one data point and testing on the omitted point, offering a robust evaluation of LASSO regression for predictive accuracy and variable selection. After LOOCV Lambda min and lambda 1se are values that help determine the level of regularization in LASSO. Lambda min is the smallest lambda that simplifies the model by setting some coefficients to zero. Lambda 1 se strikes a balance between model complexity and predictive power, offering a more interpretable model while maintaining reasonable performance.
+
+
+# Results
+
+I analyzed the Gender Statistics Database, initially comprising over 1000 features across 115 countries. However, after merging the Happiness score dataset as the dependent variable, my analysis can continue only on 56 countries. To prepare for LASSO and potential PCR predictions, feature reduction was essential. This process involved removing unsuitable binary variables, addressing missing data (including two countries with substantial missing data), and eliminating redundant features with "total" values. Furthermore, I retained a maximum of 7 missing values per variable, replacing them with respective mean values. This led to an analysis involving 54 countries and 54 features, including Country name, Happiness score, and Country Code.
+
+Given the small sample size, Leave-One-Out Cross-Validation was employed to determine the optimal lambda for the model. Figure 1 illustrates the MSE values for various lambda values, with dashed lines indicating lambda min and lambda 1 se. It is important to note that selecting the model with the lowest RMSE and highest R-squared value can be challenging due to the limited sample size.
+
+
+```{r echo=FALSE, results='hide', warning=FALSE, message=FALSE}
+##############################################################
+
+########  M A N I P U L A T E   G E N D E R   S E T  #########
+
+##############################################################
+#Load datasets
+if (!require("tidyverse")) install.packages("tidyverse")
+
+Gender <- read.csv("C:/Users/gergo/Desktop/COURSES/I. Introduction to Data Science/IndividualAssignment/Datasets/672958gm_Gender_variable.csv")
+
+#Remove the first column because it it not relevant for me anymore
+Gender<- Gender[,-1]
+#*------------------------------------------------------------------------------------------------------------- NO CSV
+#Remove all features which are population numbers and percentages, keep only male and female numbers from (0-14, 15-64, 65+, Total)
+columns_to_delete <- c(
+  "SP.POP.0004.FE", "SP.POP.0004.MA", "SP.POP.0014.TO.ZS",
+  "SP.POP.0509.FE", "SP.POP.0509.MA", "SP.POP.1014.FE",
+  "SP.POP.1014.MA", "SP.POP.1519.FE", "SP.POP.1519.MA",
+  "SP.POP.1564.TO.ZS", "SP.POP.1564.TO", "SP.POP.2024.FE",
+  "SP.POP.2024.MA", "SP.POP.2529.FE", "SP.POP.2529.MA",
+  "SP.POP.3034.FE", "SP.POP.3034.MA", "SP.POP.3539.FE",
+  "SP.POP.3539.MA", "SP.POP.4044.FE", "SP.POP.4044.MA",
+  "SP.POP.4549.FE", "SP.POP.4549.MA", "SP.POP.5054.FE",
+  "SP.POP.5054.MA", "SP.POP.5559.FE", "SP.POP.5559.MA",
+  "SP.POP.6064.FE", "SP.POP.6064.MA", "SP.POP.65UP.TO.ZS",
+  "SP.POP.65UP.TO", "SP.POP.6569.FE", "SP.POP.6569.MA",
+  "SP.POP.7074.FE", "SP.POP.7074.MA", "SP.POP.7579.FE",
+  "SP.POP.7579.MA", "SP.POP.80UP.FE", "SP.POP.80UP.MA",
+  "SP.POP.TOTL.FE.ZS")
+
+# Delete columns from the 'Gender' data frame
+Gender <- Gender[, !names(Gender) %in% columns_to_delete]
+
+
+#Remove all the collumn with only NAs
+na <- sapply(Gender, function(x) sum(is.na(x)))
+remove <- which(na == nrow(Gender))
+Gender<- Gender[,-remove]
+
+#Identify columns that contain only 0, 1 or NA because these are binary variables and we cannot keep them for PCA
+columns_to_remove <- sapply(Gender, function(col) all(col %in% c(0, 1, NA)))
+sum(columns_to_remove)
+Gender <- Gender[, !columns_to_remove]
+
+#Import from Happiness_score.csv
+Happiness <- read.csv("C:/Users/gergo/Desktop/COURSES/I. Introduction to Data Science/IndividualAssignment/Datasets/Happiness_scoreCSV.csv")
+colnames(Happiness)[1] <-"CountryName"
+compare <- merge(Gender, Happiness, by="CountryName", all.y = T, all.x = T)
+#Rename and merge
+Happiness[60,1]<- "Kyrgyz Republic"
+Happiness[98,1]<- "Iran, Islamic Rep."
+Happiness[118,1]<- "Egypt, Arab Rep."
+Happiness[130,1]<- "Congo, Rep."
+
+Gender<- merge(Happiness,Gender, by="CountryName")
+
+
+
+Gender$NAs <- rowSums(is.na(Gender))
+Gender <- Gender[, c("NAs", setdiff(names(Gender), "NAs"))]
+#Kosovo Mynamar delete
+Gender <- Gender %>%
+  filter(rowSums(is.na(Gender)) <= 90)
+
+#Count NAs in each column to check how the columns infected with them
+na_counts <- colSums(is.na(Gender))
+na_counts_row <- data.frame(t(na_counts))
+Gender <- rbind(Gender, na_counts_row)
+#Check how many levels are there 
+na_counts_levels<- as.factor(na_counts)
+table(na_counts_levels)
+#Identify the columns that have NAs and remove it
+columns_to_remove <- names(Gender)[Gender[nrow(Gender), ] > 4]
+Gender <- Gender[, !(names(Gender) %in% columns_to_remove)]
+#Delete last NA row
+Gender<- Gender[-nrow(Gender),]
+
+Codes <- data.frame(colnames(Gender))
+
+#Remove "Total" columns ------------------------------------------------------------------------------------------------- NO CSV
+columns_to_keep <- c(
+  "CountryName", "Happiness_score", "CountryCode",
+  "SP.POP.DPND", "SL.EMP.TOTL.SP.FE.ZS", "SL.EMP.TOTL.SP.MA.ZS",
+  "SL.EMP.1524.SP.FE.ZS", "SL.EMP.1524.SP.MA.ZS", "NY.GDP.MKTP.CD",
+  "NY.GDP.MKTP.KD.ZG", "NY.GDP.PCAP.KD", "NY.GDP.PCAP.CD", "NY.GNP.PCAP.CD",
+  "NY.GNP.PCAP.PP.CD", "NY.GNP.ATLS.CD", "FP.CPI.TOTL.ZG",
+  "SL.TLF.ACTI.1524.FE.ZS", "SL.TLF.ACTI.1524.MA.ZS", "SL.TLF.CACT.FE.ZS",
+  "SL.TLF.CACT.MA.ZS", "SL.TLF.TOTL.FE.IN", "SL.TLF.TOTL.FE.ZS",
+  "SL.TLF.TOTL.MA.IN", "SH.MMR.LEVE", "SH.PAR.LEVE.MA", "SH.PAR.LEVE.FE",
+  "SH.PTR.LEVE", "SH.PAR.LEVE", "SP.POP.0014.FE.IN", "SP.POP.0014.MA.IN",
+  "SP.POP.1564.FE.IN", "SP.POP.1564.MA.IN", "SP.POP.65UP.FE.IN",
+  "SP.POP.65UP.MA.IN", "SG.GEN.PARL.ZS", "SL.TLF.CACT.FM.ZS",
+  "SL.UEM.1524.FM.ZS", "SG.AGE.RTRE.FL.FE", "SG.AGE.RTRE.FL.MA",
+  "SP.RUR.TOTL.ZS", "SL.UEM.TOTL.FE.ZS", "SL.UEM.TOTL.MA.ZS",
+  "SL.UEM.1524.FE.ZS", "SL.UEM.1524.MA.ZS", "SP.URB.TOTL.IN.ZS",
+  "SG.LAW.INDX", "SG.LAW.INDX.AS", "SG.LAW.INDX.EN", "SG.LAW.INDX.MR",
+  "SG.LAW.INDX.MO", "SG.LAW.INDX.PR", "SG.LAW.INDX.PY", "SG.LAW.INDX.PE",
+  "SG.LAW.INDX.WP")
+
+# Filter columns to keep in the 'Gender' data frame
+Gender <- Gender[, names(Gender) %in% columns_to_keep]
+
+#Replace NAs with col's means
+Gender <- data.frame(lapply(Gender, function(x) {
+  if(is.numeric(x)) {
+    ifelse(is.na(x), mean(x, na.rm = TRUE), x)
+  } else {
+    x
+  }
+}))
+
+##############################################################
+
+####  M A N I P U L A T E   P R E D I C T I O N   S E T  #####
+
+##############################################################
+#Cleaning Predictin dataset according to the final Gender dataset
+
+#Load dataset
+Prediction <- read.csv("C:/Users/gergo/Desktop/COURSES/I. Introduction to Data Science/IndividualAssignment/Datasets/Prediction.csv")
+
+#Remove the first column because it it not relevant for me anymore
+Prediction<- Prediction[,-1]
+
+# Get the column names (feature names) from the main dataset
+features <- colnames(Gender)
+
+#Remove CountryName, CountryCode, Hapiness_score
+features<- features[-c(2)]
+
+#Subset the prediction dataset to include only the columns that exist in the main dataset
+Prediction <- Prediction %>%
+  select(all_of(features))
+
+#Remove CountryCode,
+Prediction<- Prediction[,-2]
+
+#Excport to csv
+#write.csv(Gender, file = "Final_v3.csv", row.names = FALSE)
+#write.csv(Prediction, file = "Prediction_Final_v3.csv", row.names = FALSE)
+
+##############################################################
+
+######################  L A S S O ############################
+
+##############################################################
+
+if (!require("glmnet")) install.packages("glmanet")
+if (!require("corrplot")) install.packages("corrplot")
+if (!require("formattable")) install.packages("formattable")
+if (!require("caret")) install.packages("caret")
+if (!require("knitr")) install.packages("knitr")
+```
+
+```{r echo=FALSE, results='hide', warning=FALSE, message=FALSE}
+#LASSO <- read.csv("C:/Users/gergo/Desktop/COURSES/I. Introduction to Data Science/IndividualAssignment/CleanDatasets/Final_v3.csv")
+LASSO <- Gender
+
+#Correlation plot
+#cor_matrix <- cor(LASSO[4:ncol(LASSO)])
+#corrplot(cor_matrix, type = "upper",diag = F, method = "color", main = "Correlation plot",
+#         cex.main= 1, tl.col = "black", tl.cex = 0.3, cl.pos = "n", number.cex = 0.4, mar=c(0,0,1,0))
+
+
+#Defining y, x for basic LASSO model
+lasso_y <- LASSO$Happiness_score
+lasso_x <- model.matrix(Happiness_score ~ ., data = LASSO)
+
+#Build LASSO model
+lasso_mod<-glmnet(lasso_x, lasso_y, alpha=1)
+
+#Plot the model
+#plot(lasso_mod, label = T, xvar = "lambda", cex.axis = 1.2, cex = 1.2)
+
+
+#Splitting to a training and a test set
+set.seed(29)
+sample_size = floor(0.8*nrow(LASSO))
+picked = sample(seq_len(nrow(LASSO)),size = sample_size)
+train_data_lasso = LASSO[picked,]
+test_data_lasso = LASSO[-picked,]
+
+#Create a full_matrix, so that both matrices are going to have the same factor levels
+full_matrix_lasso <- scale(model.matrix(Happiness_score ~ .,
+                                        data = subset(LASSO, 
+                                                      select = -c(CountryName, 
+                                                                  CountryCode))))
+
+#Creating x values for both train and test
+train_x_lasso <- full_matrix_lasso[picked, -1]
+test_x_lasso <- full_matrix_lasso[-picked, -1]
+
+#Defining y for training set
+train_y_lasso <- train_data_lasso$Happiness_score
+
+#Building optimal LASSO model
+#Leave-One-Out cross validation to find the best lambda
+lambdas_lasso <- 10^seq(2, -3, length.out = 100)
+
+cv_lasso <- cv.glmnet(train_x_lasso, 
+                      train_y_lasso, 
+                      alpha = 1,
+                      lambda = lambdas_lasso,
+                      nfolds = 43, 
+                      intercept = T,
+                      grouped = F)
+
+lasso_lambdas <- data.frame(cbind(lambdamin = cv_lasso$lambda.min, 
+                                  lambda1se = cv_lasso$lambda.1se))
+
+lasso <- glmnet(train_x_lasso, 
+                train_y_lasso, 
+                alpha = 1,
+                lambda = lambdas_lasso,
+                nfolds = 43, 
+                intercept = T,
+                grouped = F)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width=8, fig.height=3.5, fig.cap="Tuning LASSO hyperparameter with Cross-Validation and visualizing regularization paths", fig.align='center'}
+par(mfrow = c(1,2))
+plot(cv_lasso, cex.axis = 1.2, cex = 1.2) # Custom color, point type, line width, and point size
+text(log(cv_lasso$lambda.min), min(cv_lasso$cvm) * 150, "lambda.min ->", pos = 2, col = "red", cex = 0.8)
+text(log(cv_lasso$lambda.1se), min(cv_lasso$cvm) * 150, "<-lambda.1se", pos = 4, col = "red", cex = 0.8)
+plot(lasso, xvar="lambda", label= T)
+```
+
+```{r echo=FALSE, results='hide', warning=FALSE, message=FALSE}
+#Conducting the models
+lasso_lmin <- glmnet(train_x_lasso, 
+                     train_y_lasso, 
+                     alpha = 1,
+                     lambda = lasso_lambdas[,"lambdamin"],
+                     nfolds = 43, 
+                     intercept = T,
+                     grouped= F)
+
+lasso_l1se <- glmnet(train_x_lasso, 
+                     train_y_lasso, 
+                     alpha = 1,
+                     lambda = lasso_lambdas[,"lambda1se"],
+                     nfolds = 43, 
+                     intercept = T,
+                     grouped= F)
+
+#Creating y variable for the test data
+test_y_lasso<-test_data_lasso$Happiness_score
+
+lasso_lmin_pred <- predict(lasso_lmin, newx = test_x_lasso)
+lasso_l1se_pred <- predict(lasso_l1se, newx = test_x_lasso)
+
+lasso_lmin_mse <- round(mean((lasso_lmin_pred-test_y_lasso)^2), digits = 2)
+lasso_l1se_mse <- round(mean((lasso_l1se_pred-test_y_lasso)^2), digits = 2)
+
+mse_lasso <- rbind(lasso_lmin = lasso_lmin_mse, 
+                   lasso_l1se = lasso_l1se_mse)
+colnames(mse_lasso)[1] <- "MSE"
+
+#Calculating RMSE values
+lasso_lmin_rmse <- round(sqrt(mean((lasso_lmin_pred-test_y_lasso)^2)), digits = 2)
+lasso_l1se_rmse <- round(sqrt(mean((lasso_l1se_pred-test_y_lasso)^2)), digits = 2)
+
+rmse_lasso <- rbind(lasso_lmin = lasso_lmin_rmse, 
+                    lasso_l1se = lasso_l1se_rmse)
+colnames(rmse_lasso)[1] <- "RMSE"
+
+#Calculating R-squared values
+lasso_lmin_rsq <- percent(R2(lasso_lmin_pred, test_y_lasso), accuracy = 0.01)
+lasso_l1se_rsq <- percent(R2(lasso_l1se_pred, test_y_lasso), accuracy = 0.01)
+
+rsquared_lasso <- rbind(lasso_lmin = lasso_lmin_rsq, 
+                        lasso_l1se = lasso_l1se_rsq)
+colnames(rsquared_lasso)[1] <- "R-squared"
+
+comparison_table_lasso <- data.frame(cbind(mse_lasso, rmse_lasso, round(rsquared_lasso,3)))
+rownames(comparison_table_lasso)[1] <-"LASSO lamda.min"
+rownames(comparison_table_lasso)[2] <-"LASSO lamda.1se"
+
+
+
+
+coefficients<-lasso_l1se$beta
+non_zero<- apply(coefficients,1,function(x) x != 0)
+coeffs2<- data.frame(subset(non_zero, non_zero != 0))
+coeffnames<-rownames(coeffs2)
+coeffs<- data.frame(round(subset(coefficients, coefficients[1:51] != 0),3))
+coeffs<- cbind(coeffnames,coeffs)
+colnames(coeffs)<- c("Coefficient name", "Coefficient value")
+
+```
+
+When I looked at the results in Table 1 on the left side, it was pretty clear that the lambda values around 1 standard error (lambda 1 SE) led to lower Root Mean Square Error (RMSE) and higher R-squared values. So, I decided to go with the lambda that gave the smallest prediction error. After that, I delved into a detailed analysis of the model results. As I ran the LASSO regression, I could see which coefficients were still in play, and you can find those listed in Table 1 on the right side.It is important to note that these results are associated with higher Happiness scores first, and  they indicate a stronger presence of gender equality second.
+
+**NY.GNP.PCAP.PP.CD:** GNI per Capita (PPP): A positive coefficient shows that higher income and economic development are linked to greater gender equality, indicating that increased resources and opportunities in high-GNI countries promote gender empowerment.
+**SG.GEN.PARL.ZS:** Proportion of Seats Held by Women in National Parliaments: A positive coefficient suggests that countries with more women in national parliaments tend to have improved gender equality, highlighting the role of political representation in advancing gender equality goals.
+**SG.LAW.INDX.AS:** Women's Legal Rights and Access to Assets (Assets Indicator Score): A positive coefficient indicates that countries with strong legal protections and economic opportunities for women tend to have better gender equality, emphasizing the significance of legal frameworks and economic opportunities in promoting gender equality.
+**SG.LAW.INDX.PR:** Women's Legal Rights Related to Parenthood (Parenthood Indicator Score): A positive coefficient implies that countries with favorable legal rights related to parenthood for women tend to exhibit better gender equality, indicating that supportive legal rights for working mothers and fathers contribute to gender equality.
+*Interpretation was written only regarding the coefficients, which are aligned with the context of my research question.*
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+kable(list(comparison_table_lasso, coeffs), caption = "Selected LASSO coefficients and their values")
+```
+Moving to Principal Component Analysis (PCA), it is important to note that PCA is an unsupervised learning method. In PCA, I am interested in the independent variables, often called features, and I do not need a dependent variable.
+My primary goal here is to simplify the dataset by focusing on the most important components. I aim to have these components explain more than 70% of the variation in the data. To ensure that I am on the right track, I am looking for eigenvalues greater than 1. The result of a permutation test further supports my approach, as it is within the confidence interval, suggesting that this PC's contribution to explaining the variance in the data is not significantly different from what would be expected by random chance. In Table 2, I can see that the fifth Principal Component (PC5) aligns well with my criteria. For precise component values and confidence intervals for both permutation test and bootstrap, I refer to Appendix Table 5.
+```{r echo=FALSE, results='hide', warning=FALSE, message=FALSE}
+if (!require("factoextra")) install.packages("factoextra")
+if (!require("FactoMineR")) install.packages("FactoMineR")
+if (!require("corrplot")) install.packages("corrplot")
+if (!require("boot")) install.packages("boot")
+if (!require("gridExtra")) install.packages("gridExtra")
+
+#PCA <- read.csv("C:/Users/gergo/Desktop/COURSES/I. Introduction to Data Science/IndividualAssignment/CleanDatasets/Final_v3.csv")
+PCA <- Gender
+
+pca_result <- princomp(PCA[,4:ncol(PCA)], cor = T, score = T)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width=7, fig.height=4, fig.cap="CAPTION", fig.align='center'}
+#fviz_eig(pca_result, addlabels = TRUE, barfill ="#87CEEB", barcolor = "#87CEEB", linecolor = "black")
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width=7, fig.height=3.5, fig.cap="Permutation test and Bootstrap for PCA", fig.align='center'}
+par(mfrow = c(1,2))
+source("C:/Users/gergo/Desktop/COURSES/I. Introduction to Data Science/Assignment2/permtestPCA.R")
+par(cex.main = 1, cex.lab = 1.2, cex.axis = 1.2, cex.legend = 0.5)
+permrange <- permtestPCA(PCA[,4:ncol(PCA)])
+abline(v = 5, col = "red")
+axis(side = 1, at = c(5), labels = c("5"), las = 0.5, tck = -0.015)
+
+#Conduct the bootstrap
+#Define function
+my_boot_pca <- function(x, ind){
+  res <- princomp(x[ind, ], cor = TRUE)
+  return(res$sdev^2)
+}
+
+#Run bootstrap
+set.seed(29)
+fitboot  <- boot(data = PCA[,4:ncol(PCA)], statistic = my_boot_pca, R = 1000)
+boot_ev <- fitboot$t    
+
+#Get variance explained
+variance_explained <- rowSums(boot_ev[,1:5])/rowSums(boot_ev)
+
+#Visualize data
+bootstrap <- hist(variance_explained, xlab = "Variance explained", las = 1, col = "grey", 
+                  main = "Bootstrap Confidence Interval", breaks = 40, cex.axis = 1.2,cex.lab=1.2)
+perc.alpha <- quantile(variance_explained, c(0.025, 1 - 0.025) )
+abline(v = perc.alpha, col = "red", lwd = 2)
+abline(v = sum(pca_result$sdev[1:5]^2)/sum(pca_result$sdev^2), col = "green",lwd=2)
+```
+The bootstrap histogram (Figure 2, right side), based on the first 5 Principal Components (PCs), provides insights into the explained variance, with an original value of 72% and confidence intervals ranging from 71.9% to 77.9%. Following a normal distribution assumption, the histogram's shape, center, and spread suggest the bootstrapped explained variances align well with the expected distribution. An approximately symmetric, bell-shaped curve is observed with the peak near the original value, indicating consistency. Minimal variability supports the reliability of the initial explained variance estimate for these 5 PCs.
+
+Following the selection of the first 5 Principal Components (PCs), a relabeling process was undertaken based on the top contributors within each component. The top contributors were determined with reference to Appendix Table 6, which provides insight into the primary contributing variables. Notably, for the first and second components, the focus was narrowed to the top 8 contributors, as they collectively account for more than 44% of the explained variance, as indicated in Table 2. For the third PC, attention was directed toward the top 6 contributors, while the fourth and fifth PCs were renamed by considering only the top 3 contributors. Utilizing the provided dictionary in Excel, the following labels were assigned: 1PC as "Economic Metrics," 2PC as "Demographic Metrics," 3PC as "Labor Market Metrics," 4PC as "Women's Economic Opportunities," and 5PC as "Economic and Labor Market Dynamics."
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+var_explained <- pca_result$sdev^2 / sum(pca_result$sdev^2) #PC5 72%
+# Cumulative % of explained variance
+PC1_5 <- var_explained[1:5]
+cum_var<-data.frame(as.data.frame(rbind("% of explained variance" = 
+                                          PC1_5,
+                                        "Cumulative % of explained variance" = 
+                                          c(PC1_5[1],
+                                            PC1_5[1]+PC1_5[2],
+                                            PC1_5[1]+PC1_5[2]+PC1_5[3],
+                                            PC1_5[1]+PC1_5[2]+PC1_5[3]+PC1_5[4],
+                                            PC1_5[1]+PC1_5[2]+PC1_5[3]+PC1_5[4]+PC1_5[5]))))
+colnames(cum_var)<-c("PC1", "PC2", "PC3", "PC4", "PC5")
+eigenvalues<- cbind(PC1=pca_result$sdev[1]^2,PC2=pca_result$sdev[2]^2,PC3=pca_result$sdev[3]^2,PC4=pca_result$sdev[4]^2,PC5=pca_result$sdev[5]^2)
+rownames(eigenvalues)<-"Eigenvalues"
+component_decision<- rbind(cum_var,eigenvalues)
+component_decision<-round(component_decision,3)
+############################################################## TABLE
+kable(component_decision, caption = "Explained variance, Cumulative variance and Eigenvalues for 5 Principal Components ")
+```
+ 
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+test_pca<-PCA(PCA[,5:ncol(PCA)], scale.unit = T, graph = F)
+#corrplot(test_pca$var$coord[,1:5], method = "color", main = "Correlation Plot", tl.cex = 0.4,tl.col = "black",addCoef.col = "black", cl.pos = "n", number.cex = 0.3,mar=c(0,0,1,0),cex.main = 1, cex.lab = 0.5, cex.axis = 0.5) 
+
+plot1<-fviz_contrib(pca_result, choice = "var")
+loadings_first_comp <- pca_result$loadings[, 1]
+ordered_loadings1 <- sort(abs(loadings_first_comp), decreasing = TRUE)
+PC1_Contributors <- names(ordered_loadings1[1:8])
+pc1<-as.data.frame(PC1_Contributors)
+
+plot2<-fviz_contrib(pca_result, choice = "var", axes = 2)
+loadings_second_comp <- pca_result$loadings[, 2]
+ordered_loadings2 <- sort(abs(loadings_second_comp), decreasing = TRUE)
+PC2_Contributors <- names(ordered_loadings2[1:8])
+pc2<-as.data.frame(PC2_Contributors) 
+
+plot3<-fviz_contrib(pca_result, choice = "var", axes = 3)
+loadings_third_comp <- pca_result$loadings[, 3]
+ordered_loadings3 <- sort(abs(loadings_third_comp), decreasing = TRUE)
+PC3_Contributors <- names(ordered_loadings3[1:5])
+pc3<-as.data.frame(PC3_Contributors)
+
+plot4<-fviz_contrib(pca_result, choice = "var", axes = 4)
+loadings_fourth_comp <- pca_result$loadings[, 4]
+ordered_loadings4 <- sort(abs(loadings_fourth_comp), decreasing = TRUE)
+PC4_Contributors <- names(ordered_loadings4[1:3])
+pc4<-as.data.frame(PC4_Contributors)
+
+plot5<-fviz_contrib(pca_result, choice = "var", axes = 5)
+loadings_fifth_comp <- pca_result$loadings[, 5]
+ordered_loadings5 <- sort(abs(loadings_fifth_comp), decreasing = TRUE)
+PC5_Contributors <- names(ordered_loadings5[1:3])
+pc5<-as.data.frame(PC5_Contributors)
+
+#kable(list(pc1,pc2,pc3,pc4,pc5), caption = "Contribution")
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width=7, fig.height=4, fig.cap="CAPTION", fig.align='center'}
+#grid.arrange(plot1, plot2, ncol = 2)
+#grid.arrange(plot3, plot4, plot5, ncol = 3)
+```
+Next, I applied Principal Component Regression (PCR) analysis to the same training dataset used in the previous LASSO analysis to facilitate a thorough comparison. Subsequently, I utilized the PCR model to make predictions on the same test dataset. I obtained consistent evaluation metrics such as Mean Squared Error (MSE), Root Mean Squared Error (RMSE), and R-squared again.
+
+Table 3 provides a comprehensive overview of the performance indicators of the three models. Considering the detailed analysis performed, especially due to the relatively small sample size, it is reasonable to say that the lambda 1 SE Lasso is the optimal choice for predicting the happiness point in the given three countries, because it has the smallest Mean Squared Error and the highest R-Squared value. Additionally with small sample size lambda 1 SE can bring a more robust result than Lambda min.
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+#Splitting to a training and a test set
+set.seed(29)
+sample_size = floor(0.8*nrow(PCA))
+picked = sample(seq_len(nrow(PCA)),size = sample_size)
+train_data = PCA[picked,]
+test_data = PCA[-picked,]
+test_x <- subset(test_data, select = -c(Happiness_score, CountryName, CountryCode))
+
+if (!require("pls")) install.packages("pls")
+#model
+pcr_model<- pcr(data= train_data, Happiness_score ~ SP.POP.DPND + SL.EMP.TOTL.SP.FE.ZS +
+                  SL.EMP.TOTL.SP.MA.ZS + SL.EMP.1524.SP.FE.ZS + SL.EMP.1524.SP.MA.ZS +
+                  NY.GDP.MKTP.CD + NY.GDP.MKTP.KD.ZG + NY.GDP.PCAP.KD + NY.GDP.PCAP.CD + NY.GNP.PCAP.CD +
+                  NY.GNP.PCAP.PP.CD + NY.GNP.ATLS.CD + FP.CPI.TOTL.ZG + SL.TLF.ACTI.1524.FE.ZS +
+                  SL.TLF.ACTI.1524.MA.ZS + SL.TLF.CACT.FE.ZS + SL.TLF.CACT.MA.ZS +
+                  SL.TLF.TOTL.FE.IN + SL.TLF.TOTL.FE.ZS + SL.TLF.TOTL.MA.IN + SH.MMR.LEVE +
+                  SH.PAR.LEVE.MA + SH.PAR.LEVE.FE + SH.PTR.LEVE + SH.PAR.LEVE + SP.POP.0014.FE.IN +
+                  SP.POP.0014.MA.IN + SP.POP.1564.FE.IN+
+                  SP.POP.1564.MA.IN+
+                  SP.POP.65UP.FE.IN+
+                  SP.POP.65UP.MA.IN+
+                  SG.GEN.PARL.ZS+
+                  SL.TLF.CACT.FM.ZS+
+                  SL.UEM.1524.FM.ZS+
+                  SG.AGE.RTRE.FL.FE+
+                  SG.AGE.RTRE.FL.MA+
+                  SP.RUR.TOTL.ZS+
+                  SL.UEM.TOTL.FE.ZS+
+                  SL.UEM.TOTL.MA.ZS+
+                  SL.UEM.1524.FE.ZS+
+                  SL.UEM.1524.MA.ZS+
+                  SP.URB.TOTL.IN.ZS+
+                  SG.LAW.INDX+
+                  SG.LAW.INDX.AS+
+                  SG.LAW.INDX.EN+
+                  SG.LAW.INDX.MR+
+                  SG.LAW.INDX.MO+
+                  SG.LAW.INDX.PR+
+                  SG.LAW.INDX.PY+
+                  SG.LAW.INDX.PE+
+                  SG.LAW.INDX.WP, validation= "CV", scale= TRUE)
+
+pcr_pred <- predict(pcr_model, newdata = test_data, ncomp = 5)
+
+#Creating y variable for the test data
+test_y<-as.numeric(test_data$Happiness_score)
+
+
+#Mean
+mean_actual <- mean(test_y)
+#TSS
+TSS <- sum((test_y - mean_actual)^2)
+#RSS
+RSS <- sum((test_y - pcr_pred)^2)
+
+pca_mse <- round(mean((pcr_pred-test_y)^2), digits = 2)
+pca_rmse <- round(sqrt(mean((pcr_pred-test_y)^2)), digits = 2)
+pca_rsq <- round(1 - (RSS / TSS),3)
+
+comparison_table <- data.frame(cbind(pca_mse, pca_rmse, pca_rsq))
+colnames(comparison_table) <- c("MSE", "RMSE", "R-squared")
+colnames(comparison_table_lasso) <- c("MSE", "RMSE", "R-squared")
+decision_table<- rbind(comparison_table,comparison_table_lasso)
+rownames(decision_table)[1]<- "PCR"
+rownames(decision_table)[2]<- "LASSO lambda.min"
+rownames(decision_table)[3]<- "LASSO lamda.1se"
+############################################################# TABLE
+kable(decision_table, caption = "Model comparison: PCR and LASSO performance metrics", col.names = c("Model","MSE","RMSE", "R-squared"))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='hide'}
+sum(is.na(Prediction))
+
+x_pred_sample <- scale(model.matrix(~ .,
+                                    data = subset(Prediction, select = -1)))[,-1]
+sum(is.na(x_pred_sample))
+x_pred_sample[is.na(x_pred_sample)]<-0
+sum(is.na(x_pred_sample))
+
+lasso_pred<-predict(lasso_l1se, newx = x_pred_sample)
+colnames(lasso_pred)<- "Happiness_score"
+
+Prediction <- cbind(Prediction[, 1:1], lasso_pred, Prediction[, (1 + 1):ncol(Prediction)])
+colnames(Prediction)[1]<- "CountryName"
+```
+
+The predictions for the Happiness Scores of the three countries are provided in the Appendix, Table 4.
+
+# Conclusion
+
+The LASSO and PCA models reveal the vital role of specific variables in predicting Happiness Scores, including Age dependency ratio, GNI per capita, Proportion of seats held by women in national parliaments, Retirement age for males, Male unemployment rate, Women's Legal Rights related to assets, and Women's Legal Rights related to parenthood. These variables align with economic, demographic, labor market, women's economic opportunities, and economic and labor market dynamics in the PCA model, underscoring their impact on a country's happiness index.
+In summary, these findings provide insights into enhancing overall well-being and addressing gender equality, with LASSO supporting the importance of gender equity in boosting happiness. Thus, governments should prioritize gender equality efforts, recognizing their intrinsic connection to increased happiness. This research offers valuable guidance for policymakers, emphasizing the need for targeted interventions to promote both societal happiness and gender equality simultaneously.
+
+# Appendix
+
+\newpage
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width=4, fig.height=3, fig.cap="Scree plot for PCA", fig.align='center',fig.pos="h"}
+#fviz_eig(pca_result, addlabels = TRUE, barfill ="#87CEEB", barcolor = "#87CEEB", linecolor = "black")
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+Prediction<-Prediction[,1:2]
+Prediction[,2]<-round(Prediction[,2],3)
+kable(Prediction, caption = "LASSO regression predictions for Happiness Scores" ,col.names = c("Country Name","Happiness score"))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+#Can I keep the fifth PC
+in_interval<-data.frame(c(interval= permrange[5,], pca_result$sdev[5]^2))
+rownames(in_interval)<- c("Lower Interval", "Upper Interval", "PC5")
+colnames(in_interval)<- "Permutation test"
+
+bootstrap_interval<-rbind(perc.alpha[1], perc.alpha[2], sum((pca_result$sdev[1:5]^2)/sum(pca_result$sdev^2)))
+rownames(bootstrap_interval)<- c("Lower Interval", "Upper Interval", "PC5")
+colnames(bootstrap_interval)<- "Bootstrap"
+intervals<- cbind(in_interval,bootstrap_interval)
+############################################################## TABLE
+kable(round(intervals, 3),caption = "Confidence intervals for Principal Component 5")
+#YES
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.pos="h"}
+kable(list(pc1, pc2, pc3, pc4, pc5), caption = "Top contributors by each 5 Principal Components")
+```
+
+\newpage
+
+**Data Manipluation and Cleaning**
+```{r eval=FALSE}
+#Import from Happiness_score.csv
+Happiness <- load(Happiness_score)
+colnames(Happiness)[1] <-"CountryName"
+compare <- merge(Gender, Happiness, by="CountryName", all.y = T, all.x = T)
+#I found 4 countires which had different names, 
+#therefore I renamed and then merged the datasets
+Happiness[60,1]<- "Kyrgyz Republic"
+Happiness[98,1]<- "Iran, Islamic Rep."
+Happiness[118,1]<- "Egypt, Arab Rep."
+Happiness[130,1]<- "Congo, Rep."
+
+Gender<- merge(Happiness,Gender, by="CountryName")
+
+#Replace NAs with column's means
+Gender <- data.frame(lapply(Gender, function(x) {
+  if(is.numeric(x)) {
+    ifelse(is.na(x), mean(x, na.rm = TRUE), x)
+  } else {
+    x
+  }
+}))
+```
+
+
+**Code**
+
+```{r eval=FALSE}
+##### L A S S O ######
+#Splitting to a training and a test set by 80%-20%
+set.seed(29)
+sample_size = floor(0.8*nrow(LASSO))
+picked = sample(seq_len(nrow(LASSO)),size = sample_size)
+train_data_lasso = LASSO[picked,]
+test_data_lasso = LASSO[-picked,]
+#Building optimal LASSO model
+#Leave-One-Out cross validation to find the best lambda which means number of folds are 54
+lambdas_lasso <- 10^seq(2, -3, length.out = 100)
+cv_lasso <- cv.glmnet(train_x_lasso, 
+                      train_y_lasso, 
+                      alpha = 1,
+                      lambda = lambdas_lasso,
+                      nfolds = 54, 
+                      intercept = T,
+                      grouped = F)
+#After comapring the lambdas I selected to go with lambda= lambda1se
+#I obtained the coefficient's names from the model which are not zero
+coefficients<-lasso_l1se$beta
+non_zero<- apply(coefficients,1,function(x) x != 0)
+coeffs2<- data.frame(subset(non_zero, non_zero != 0))
+coeffnames<-rownames(coeffs2)
+coeffs<- data.frame(round(subset(coefficients, coefficients[1:51] != 0),3))
+coeffs<- cbind(coeffnames,coeffs)
+colnames(coeffs)<- c("Coefficient name", "Coefficient value")
+##### P C A ######
+#After computin pca I did permutation test, and bootstrap
+#Permutation test
+source("C:/Users/gergo/Desktop/permtestPCA.R")
+par(cex.main = 1, cex.lab = 1.2, cex.axis = 1.2, cex.legend = 0.5)
+permrange <- permtestPCA(PCA[,4:ncol(PCA)])
+abline(v = 5, col = "red")
+axis(side = 1, at = c(5), labels = c("5"), las = 0.5, tck = -0.015)
+#Can I keep the fifth PC?
+in_interval<-data.frame(c(interval= permrange[5,], pca_result$sdev[5]^2))
+rownames(in_interval)<- c("Lower Interval", "Upper Interval", "PC5")
+colnames(in_interval)<- "Value"
+kable(round(in_interval, 5),caption = "TABLE")
+#YES
+#Conduct the bootstrap
+my_boot_pca <- function(x, ind){
+  res <- princomp(x[ind, ], cor = TRUE)
+  return(res$sdev^2)
+}
+#Run bootstrap
+set.seed(29)
+fitboot  <- boot(data = PCA[,4:ncol(PCA)], statistic = my_boot_pca, R = 1000)
+boot_ev <- fitboot$t    
+variance_explained <- rowSums(boot_ev[,1:5])/rowSums(boot_ev)
+bootstrap <- hist(variance_explained, xlab = "Variance explained", las = 1, col = "grey", 
+                  main = "Bootstrap Confidence Interval", breaks = 40,
+                  cex.axis = 1.2,cex.lab=1.2)
+perc.alpha <- quantile(variance_explained, c(0.025, 1 - 0.025) )
+abline(v = perc.alpha, col = "red", lwd = 2)
+abline(v = sum(pca_result$sdev[1:5]^2)/sum(pca_result$sdev^2), col = "green",lwd=2)
+#Splitting to a training and a test set with the same seed for the right comparison
+set.seed(29)
+sample_size = floor(0.8*nrow(PCA))
+#Perform PCR with 5 PC
+pcr_model<- pcr(data= train_data, Happiness_score ~ 'all features', validation= "CV",
+                scale= TRUE)
+pcr_pred <- predict(pcr_model, newdata = test_data, ncomp = 5)
+#I bind all models metrics into one dataframe
+decision_table<- rbind(comparison_table,comparison_table_lasso)
+rownames(decision_table)[1]<- "PCR"
+rownames(decision_table)[2]<- "LASSO lambda.min"
+rownames(decision_table)[3]<- "LASSO lamda.1se"
+#Selected the LASSo lambda.1se model and predict on the given sample
+lasso_pred<-predict(lasso_l1se, newx = x_pred_sample)
+colnames(lasso_pred)<- "Happiness_score"
+Prediction <- cbind(Prediction[, 1:1], lasso_pred, Prediction[, (1 + 1):ncol(Prediction)])
+colnames(Prediction)[1]<- "CountryName"
+Prediction<-Prediction[,1:2]
+kable(Prediction, caption = "TABLE" ,col.names = c("Country Name","Happiness score"))
+```
+# References 
+
+James, Gareth, Daniela Witten, Trevor Hastie, and Robert Tibshirani.
+2013. An Introduction to Statistical Learning. Vol. 112. Springer.
